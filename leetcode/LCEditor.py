@@ -1,14 +1,25 @@
 class Solution:
-    def isPalindrome(self, x: int) -> bool:
-        num = x
-        if x < 0:
-            return False
-        reverse = 0
-        while x != 0:
-            digit = x % 10
-            reverse = reverse* 10 + digit
-            x = x // 10
+    def fourSum(self, nums: List[int], target: int) -> List[List[int]]:
+        res = []
+        nums.sort()
 
-        return num == reverse
+        for i, a in enumerate(nums):
+            if i > 0 and a == nums[i - 1]:
+                continue
+            for j in range(i + 1, len(nums)):
+                if j > i + 1 and nums[j] == nums[j - 1]:
+                    continue
+                l, r = j + 1, len(nums) - 1
+                while l < r:
+                    fourSum = a + nums[j] + nums[l] + nums[r]
 
-            
+                    if fourSum < target:
+                        l += 1
+                    elif fourSum > target:
+                        r -= 1
+
+                    
+        return res
+
+#new things from nvim
+

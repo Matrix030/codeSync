@@ -41,63 +41,60 @@ function waitForEditor() {
 	});
 }
 
-// Extract code from Monaco editor
+// Extract code from Monaco editor by injecting into page context
 function getEditorCode() {
-	try {
-		// Method 1: Try global window.monaco API first (best quality)
-		if (typeof window.monaco === 'object' && window.monaco !== null && window.monaco.editor) {
+	return new Promise((resolve) => {
+		// Create a unique ID for this extraction request
+		const requestId = 'codesync-extract-' + Date.now();
 
-			if (typeof window.monaco.editor.getModels === 'function') {
-				const models = window.monaco.editor.getModels();
-
-				if (models && models.length > 0) {
-					let code = models[0].getValue();
-					if (code && code.trim().length > 0) {
-						code = code.split('').map(c => {
-							const charCode = c.charCodeAt(0);
-							if (charCode === 160) return ' ';
-							return c;
-						}).join('');
-						console.log('CodeSync: Extracted', code.length, 'chars from Monaco model');
-						return code;
-					}
-				}
-			}
-		}
-
-		// Method 2: Extract from DOM view-lines (works but may have formatting issues)
-		console.log('CodeSync: Trying view-line extraction...');
-		const editorElement = document.querySelector('.monaco-editor');
-
-		if (editorElement) {
-			const lines = editorElement.querySelectorAll('.view-line');
-			console.log('CodeSync: Found', lines.length, 'view lines');
-
-			if (lines.length > 0) {
-				let code = Array.from(lines)
-					.map(line => line.textContent)
-					.join('\n');
-
-				if (code && code.trim().length > 0) {
+		// Listen for the response from injected script
+		const handler = (event) => {
+			if (event.detail && event.detail.requestId === requestId) {
+				document.removeEventListener('codesync-code-extracted', handler);
+				let code = event.detail.code;
+				if (code) {
 					// Clean non-breaking spaces
 					code = code.split('').map(c => {
 						const charCode = c.charCodeAt(0);
 						if (charCode === 160) return ' ';
 						return c;
 					}).join('');
-
-					console.log('CodeSync: Extracted', code.length, 'chars from view-lines');
-					return code;
+					console.log('CodeSync: Extracted', code.length, 'chars from Monaco model');
 				}
+				resolve(code);
 			}
-		}
+		};
+		document.addEventListener('codesync-code-extracted', handler);
 
-		console.warn('CodeSync: Could not extract code');
-		return null;
-	} catch (error) {
-		console.error('CodeSync: Error extracting code:', error);
-		return null;
-	}
+		// Inject script into page context to access window.monaco
+		const script = document.createElement('script');
+		script.textContent = `
+			(function() {
+				let code = null;
+				try {
+					if (window.monaco && window.monaco.editor && window.monaco.editor.getModels) {
+						const models = window.monaco.editor.getModels();
+						if (models && models.length > 0) {
+							code = models[0].getValue();
+						}
+					}
+				} catch (e) {
+					console.error('CodeSync: Error in page context:', e);
+				}
+				document.dispatchEvent(new CustomEvent('codesync-code-extracted', {
+					detail: { requestId: '${requestId}', code: code }
+				}));
+			})();
+		`;
+		document.documentElement.appendChild(script);
+		script.remove();
+
+		// Timeout fallback
+		setTimeout(() => {
+			document.removeEventListener('codesync-code-extracted', handler);
+			resolve(null);
+		}, 1000);
+	});
 }
 
 // Send template to server via background script
@@ -212,7 +209,7 @@ async function init() {
 			const response = await browser.runtime.sendMessage({ type: 'CHECK_TEMPLATE_NEEDED' });
 			if (response && response.needed) {
 				console.log('CodeSync: Server needs template, extracting...');
-				const code = getEditorCode();
+				const code = await getEditorCode();
 				if (code) {
 					await sendTemplate(code);
 				}
