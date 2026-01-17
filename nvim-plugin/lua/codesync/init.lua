@@ -33,20 +33,51 @@ function M.sync()
 	vim.notify("CodeSync: Solution synced!", vim.log.levels.INFO)
 end
 
+-- Fetch template from server and load into current buffer
+function M.get_template()
+	local curl_cmd = string.format("curl -s -X GET %s/template", M.config.server_url)
+
+	local result = vim.fn.system(curl_cmd)
+
+	-- Check for errors
+	if vim.v.shell_error ~= 0 then
+		vim.notify("CodeSync: Failed to fetch template - is server running?", vim.log.levels.ERROR)
+		return
+	end
+
+	-- Parse JSON response
+	local ok, response = pcall(vim.fn.json_decode, result)
+	if not ok or not response or not response.code then
+		vim.notify("CodeSync: No template available yet", vim.log.levels.WARN)
+		return
+	end
+
+	-- Split code into lines and set buffer content
+	local lines = vim.split(response.code, "\n")
+	vim.api.nvim_buf_set_lines(0, 0, -1, false, lines)
+
+	vim.notify("CodeSync: Template loaded!", vim.log.levels.INFO)
+end
+
 -- Setup function
 function M.setup(opts)
 	opts = opts or {}
 	M.config = vim.tbl_extend("force", M.config, opts)
 
-	-- Create user command
+	-- Create user commands
 	vim.api.nvim_create_user_command("LCSync", function()
 		M.sync()
 	end, {})
 
-	-- Optional: Set up keybinding
-	vim.keymap.set("n", "<leader>ls", M.sync, { desc = "LeetCode Sync to browser" })
+	vim.api.nvim_create_user_command("LCGet", function()
+		M.get_template()
+	end, {})
 
-	print("CodeSync initialized - use :LCSync or <leader>ls")
+	-- Set up keybindings
+	vim.keymap.set("n", "<leader>ls", M.sync, { desc = "LeetCode Sync to browser" })
+	vim.keymap.set("n", "<leader>lg", M.get_template, { desc = "LeetCode Get template" })
+
+	print("CodeSync initialized - :LCSync/<leader>ls to sync, :LCGet/<leader>lg to get template")
 end
 
 return M
