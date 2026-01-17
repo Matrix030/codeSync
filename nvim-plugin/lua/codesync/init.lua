@@ -11,8 +11,10 @@ function M.sync()
 	-- Get all lines from current buffer
 	local lines = vim.api.nvim_buf_get_lines(0, 0, -1, false)
 	local code = table.concat(lines, "\n")
+
 	-- Prepare JSON payload
 	local json_payload = vim.fn.json_encode({ code = code })
+
 	-- Send to server using curl
 	local curl_cmd = string.format(
 		"curl -s -X POST %s/solution -H 'Content-Type: application/json' -d '%s'",
@@ -42,9 +44,9 @@ function M.setup(opts)
 	end, {})
 
 	-- Optional: Set up keybinding
-	vim.keymap.set("n", "<leader>ls", M.sync(), { desc = "Leetcode Sync to browser" })
+	vim.keymap.set("n", "<leader>ls", M.sync, { desc = "LeetCode Sync to browser" })
 
-	print("CodeSync initialized - user :LCSync or <leader>ls")
+	print("CodeSync initialized - use :LCSync or <leader>ls")
 end
 
 return M
