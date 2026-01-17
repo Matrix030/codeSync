@@ -3,25 +3,34 @@
   "name": "CodeSync",
   "version": "1.0",
   "description": "Sync LeetCode solutions between Neovim and browser",
+  
   "permissions": [
     "activeTab",
-    "http://localhost:8080/*"
+    "http://localhost:8080/*",
+    "https://leetcode.com/*"
   ],
+  
+  "background": {
+    "scripts": ["background.js"]
+  },
+  
   "content_scripts": [
     {
       "matches": [
-        "https://leetcode.com/problems/*"
+        "https://leetcode.com/problems/*",
+        "https://leetcode.com/problems/*/description/",
+        "https://leetcode.com/problems/*/submissions/"
       ],
-      "js": [
-        "content.js"
-      ],
-      "run_at": "document_idle"
+      "js": ["content.js"],
+      "run_at": "document_end"
     }
   ],
+  
   "browser_action": {
     "default_popup": "popup.html",
     "default_title": "CodeSync"
   },
+  
   "icons": {
     "48": "icon.png"
   }

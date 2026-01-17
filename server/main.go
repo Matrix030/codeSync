@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 )
 
@@ -47,12 +48,17 @@ func (s *Server) handleTemplatePost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Store template in memory
+	// Clean non-breaking spaces (0xC2 0xA0 in UTF-8)
+	// Replace all non-breaking spaces with regular spaces
+	cleanCode := strings.ReplaceAll(req.Code, "\u00A0", " ")
+	cleanCode = strings.ReplaceAll(cleanCode, "\xA0", " ")
+
+	// Store cleaned template in memory
 	s.mu.Lock()
-	s.template = req.Code
+	s.template = cleanCode
 	s.mu.Unlock()
 
-	log.Printf("Template received (%d bytes)", len(req.Code))
+	log.Printf("Template received (%d bytes)", len(cleanCode))
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]string{"status": "success"})
 }

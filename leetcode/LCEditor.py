@@ -1,15 +1,13 @@
+class Solution:
+    def twoSum(self, nums: List[int], target: int) -> List[int]:
+        h = {}
 
-        for i in range(len(nums)):
-            if nums[i] not in h:
-                h[nums[i]] = i
-            diff = target - nums[i]
-            if diff in h and h[diff] != i:
-                return i, h[diff]
-    def twoSum(self, nums: List[int], target: int) -> List
-[int]:
-        h = {}
-class Solution:
+        for i in range(len(nums)):
+            if nums[i] not in h:
+                h[nums[i]] = i
+            diff = target - nums[i]
+            if diff in h and h[diff] != i:
+                return i, h[diff]
 
-
-                dsadasdasdasdas
-dsadasdasdasdasdasds
+                #this is from browser part 2
+                #this is from nvim
