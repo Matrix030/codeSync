@@ -30,3 +30,21 @@ function M.sync()
 
 	vim.notify("CodeSync: Solution synced!", vim.log.levels.INFO)
 end
+
+-- Setup function
+function M.setup(opts)
+	opts = opts or {}
+	M.config = vim.tbl_extend("force", M.config, opts)
+
+	-- Create user command
+	vim.api.nvim_create_user_command("LCSync", function()
+		M.sync()
+	end, {})
+
+	-- Optional: Set up keybinding
+	vim.keymap.set("n", "<leader>ls", M.sync(), { desc = "Leetcode Sync to browser" })
+
+	print("CodeSync initialized - user :LCSync or <leader>ls")
+end
+
+return M
