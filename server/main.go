@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 )
 
 type Server struct {
@@ -73,16 +74,33 @@ func (s *Server) handleTemplateGet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Set flag that we need a fresh template
+	// Clear current template and set flag that we need a fresh one
 	s.mu.Lock()
+	s.template = ""
 	s.templateRequest = true
-	currentTemplate := s.template
 	s.mu.Unlock()
 
-	log.Printf("Template requested by Neovim, signaling extension to fetch")
+	log.Printf("Template requested by Neovim, waiting for extension to fetch...")
 
+	// Poll for up to 5 seconds waiting for extension to send template
+	for i := 0; i < 50; i++ {
+		time.Sleep(100 * time.Millisecond)
+
+		s.mu.RLock()
+		template := s.template
+		s.mu.RUnlock()
+
+		if template != "" {
+			log.Printf("Template received from extension, sending to Neovim")
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(SolutionResponse{Code: template})
+			return
+		}
+	}
+
+	log.Printf("Timeout waiting for template from extension")
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(SolutionResponse{Code: currentTemplate})
+	json.NewEncoder(w).Encode(SolutionResponse{Code: ""})
 }
 
 // POST /solution - Neovim sends solution code
