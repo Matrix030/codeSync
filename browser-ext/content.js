@@ -201,49 +201,28 @@ async function init() {
 		return;
 	}
 
-	console.log('CodeSync: Editor detected, waiting for code to load...');
+	console.log('CodeSync: Editor detected');
 
-	// Wait longer for LeetCode to load the problem code
-	setTimeout(async () => {
-		const code = getEditorCode();
-		console.log('CodeSync: First attempt - got', code ? code.length : 0, 'chars');
-		if (code && code.trim().length > 20) { // Lower threshold
-			console.log('CodeSync: Initial template extracted (' + code.length + ' chars)');
-			try {
-				await sendTemplate(code);
-			} catch (e) {
-				console.error('CodeSync: sendTemplate failed:', e);
-			}
-		} else {
-			console.log('CodeSync: Waiting longer...');
+	// Don't auto-extract template - wait for Neovim to request it
+	console.log('CodeSync: Ready - waiting for commands from Neovim');
 
-			// Try again with more delay
-			setTimeout(async () => {
-				const code2 = getEditorCode();
-				console.log('CodeSync: Second attempt - got', code2 ? code2.length : 0, 'chars');
-				if (code2 && code2.trim().length > 20) {
-					console.log('CodeSync: Template extracted on retry (' + code2.length + ' chars)');
-					await sendTemplate(code2);
-				} else {
-					console.log('CodeSync: Final attempt...');
-
-					// Final attempt
-					setTimeout(async () => {
-						const code3 = getEditorCode();
-						console.log('CodeSync: Final attempt - got', code3 ? code3.length : 0, 'chars');
-						if (code3 && code3.trim().length > 0) {
-							console.log('CodeSync: Template extracted on final try (' + code3.length + ' chars)');
-							await sendTemplate(code3);
-						} else {
-							console.warn('CodeSync: No code found - use manual fetch button');
-						}
-					}, 5000);
+	// Poll to check if server needs a template
+	setInterval(async () => {
+		try {
+			const response = await browser.runtime.sendMessage({ type: 'CHECK_TEMPLATE_NEEDED' });
+			if (response && response.needed) {
+				console.log('CodeSync: Server needs template, extracting...');
+				const code = getEditorCode();
+				if (code) {
+					await sendTemplate(code);
 				}
-			}, 5000);
+			}
+		} catch (e) {
+			// Silently fail
 		}
-	}, 5000); // Increased from 3s to 5s
+	}, 1000); // Check every second
 
-	// Start polling for solutions immediately (but old solutions won't match current template)
+	// Start polling for solutions
 	pollingInterval = setInterval(getSolutionAndInject, 2000);
 	console.log('CodeSync: Started polling for solutions every 2s');
 }

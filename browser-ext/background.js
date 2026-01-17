@@ -101,6 +101,23 @@ browser.runtime.onMessage.addListener((message, sender) => {
 		})();
 	}
 
+	if (message.type === 'CHECK_TEMPLATE_NEEDED') {
+		// Check if server needs a template
+		return (async () => {
+			try {
+				const response = await fetch(`${SERVER_URL}/template-needed`);
+				if (!response.ok) {
+					return { needed: false };
+				}
+
+				const data = await response.json();
+				return { needed: data.needed };
+			} catch (error) {
+				return { needed: false };
+			}
+		})();
+	}
+
 	if (message.type === 'INJECT_SOLUTION') {
 		// Handle injection via executeScript that injects into page context
 		return (async () => {

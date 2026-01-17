@@ -11,10 +11,11 @@ import (
 )
 
 type Server struct {
-	mu         sync.RWMutex
-	solution   string
-	template   string // Store latest template from extension
-	editorPath string
+	mu              sync.RWMutex
+	solution        string
+	template        string // Store latest template from extension
+	templateRequest bool   // Flag: does Neovim want a fresh template?
+	editorPath      string
 }
 
 type TemplateRequest struct {
@@ -53,10 +54,11 @@ func (s *Server) handleTemplatePost(w http.ResponseWriter, r *http.Request) {
 	cleanCode := strings.ReplaceAll(req.Code, "\u00A0", " ")
 	cleanCode = strings.ReplaceAll(cleanCode, "\xA0", " ")
 
-	// Store cleaned template in memory and clear old solution
+	// Store cleaned template in memory and clear flags
 	s.mu.Lock()
 	s.template = cleanCode
-	s.solution = "" // Clear old solution so it doesn't get injected
+	s.templateRequest = false // Template received, clear flag
+	s.solution = ""           // Clear old solution so it doesn't get injected
 	s.mu.Unlock()
 
 	log.Printf("Template received (%d bytes)", len(cleanCode))
@@ -71,12 +73,16 @@ func (s *Server) handleTemplateGet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.mu.RLock()
-	code := s.template
-	s.mu.RUnlock()
+	// Set flag that we need a fresh template
+	s.mu.Lock()
+	s.templateRequest = true
+	currentTemplate := s.template
+	s.mu.Unlock()
+
+	log.Printf("Template requested by Neovim, signaling extension to fetch")
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(SolutionResponse{Code: code})
+	json.NewEncoder(w).Encode(SolutionResponse{Code: currentTemplate})
 }
 
 // POST /solution - Neovim sends solution code
@@ -151,6 +157,21 @@ func main() {
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		}
 	}))
+
+	// Endpoint for extension to check if template is needed
+	http.HandleFunc("/template-needed", corsMiddleware(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		server.mu.RLock()
+		needed := server.templateRequest
+		server.mu.RUnlock()
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]bool{"needed": needed})
+	}))
 	http.HandleFunc("/solution", corsMiddleware(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPost {
 			server.handleSolutionPost(w, r)
@@ -166,3 +187,4 @@ func main() {
 	log.Printf("Editor file: %s", editorPath)
 	log.Fatal(http.ListenAndServe(port, nil))
 }
+
