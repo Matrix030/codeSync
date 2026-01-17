@@ -238,17 +238,8 @@ async function init() {
 		}
 	}, 5000); // Increased from 3s to 5s
 
-	// Start polling for solutions every 2 seconds
-	pollingInterval = setInterval(getSolutionAndInject, 2000);
-	console.log('CodeSync: Started polling for solutions every 2s');
+	console.log('CodeSync: Initialization complete - auto-injection handled by background');
 }
 
 // Start the extension
 init();
-
-// Cleanup on page unload
-window.addEventListener('beforeunload', () => {
-	if (pollingInterval) {
-		clearInterval(pollingInterval);
-	}
-});

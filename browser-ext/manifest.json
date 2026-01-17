@@ -14,6 +14,15 @@
     "scripts": ["background.js"]
   },
   
+  "commands": {
+    "inject-solution": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+I"
+      },
+      "description": "Inject solution from Neovim into LeetCode editor"
+    }
+  },
+  
   "content_scripts": [
     {
       "matches": [
