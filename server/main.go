@@ -53,9 +53,10 @@ func (s *Server) handleTemplatePost(w http.ResponseWriter, r *http.Request) {
 	cleanCode := strings.ReplaceAll(req.Code, "\u00A0", " ")
 	cleanCode = strings.ReplaceAll(cleanCode, "\xA0", " ")
 
-	// Store cleaned template in memory
+	// Store cleaned template in memory and clear old solution
 	s.mu.Lock()
 	s.template = cleanCode
+	s.solution = "" // Clear old solution so it doesn't get injected
 	s.mu.Unlock()
 
 	log.Printf("Template received (%d bytes)", len(cleanCode))

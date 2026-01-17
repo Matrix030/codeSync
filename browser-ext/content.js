@@ -243,7 +243,7 @@ async function init() {
 		}
 	}, 5000); // Increased from 3s to 5s
 
-	// Start polling for solutions every 2 seconds
+	// Start polling for solutions immediately (but old solutions won't match current template)
 	pollingInterval = setInterval(getSolutionAndInject, 2000);
 	console.log('CodeSync: Started polling for solutions every 2s');
 }
