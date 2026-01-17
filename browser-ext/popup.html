@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+	<meta charset="utf-8">
+	<style>
+		body {
+			width: 200px;
+			padding: 15px;
+			font-family: Arial, sans-serif;
+		}
+
+		h3 {
+			margin: 0 0 10px 0;
+			font-size: 16px;
+		}
+
+		.status {
+			padding: 8px;
+			border-radius: 4px;
+			margin-bottom: 10px;
+			font-size: 12px;
+		}
+
+		.status.active {
+			background: #d4edda;
+			color: #155724;
+		}
+
+		.status.inactive {
+			background: #f8d7da;
+			color: #721c24;
+		}
+
+		button {
+			width: 100%;
+			padding: 8px;
+			margin: 5px 0;
+			cursor: pointer;
+			border: none;
+			border-radius: 4px;
+			font-size: 13px;
+		}
+
+		.btn-primary {
+			background: #007bff;
+			color: white;
+		}
+
+		.btn-primary:hover {
+			background: #0056b3;
+		}
+	</style>
+</head>
+
+<body>
+	<h3>CodeSync</h3>
+	<div id="status" class="status inactive">
+		Checking connection...
+	</div>
+	<button class="btn-primary" id="fetchBtn">Fetch Template</button>
+	<button class="btn-primary" id="injectBtn">Inject Solution</button>
+
+	<script src="popup.js"></script>
+</body>
+
+</html>
