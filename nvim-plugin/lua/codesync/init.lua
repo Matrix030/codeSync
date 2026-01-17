@@ -12,17 +12,29 @@ function M.sync()
 	local lines = vim.api.nvim_buf_get_lines(0, 0, -1, false)
 	local code = table.concat(lines, "\n")
 
-	-- Prepare JSON payload
-	local json_payload = vim.fn.json_encode({ code = code })
+	-- Write to temporary file to avoid shell escaping issues
+	local tmpfile = os.tmpname()
+	local f = io.open(tmpfile, "w")
+	if not f then
+		vim.notify("CodeSync: Failed to create temp file", vim.log.levels.ERROR)
+		return
+	end
 
-	-- Send to server using curl
+	-- Write JSON payload to file
+	f:write(vim.fn.json_encode({ code = code }))
+	f:close()
+
+	-- Send to server using curl with file input
 	local curl_cmd = string.format(
-		"curl -s -X POST %s/solution -H 'Content-Type: application/json' -d '%s'",
+		"curl -s -X POST %s/solution -H 'Content-Type: application/json' -d @%s",
 		M.config.server_url,
-		json_payload:gsub("'", "'\\''") -- Escape single quotes for shell
+		tmpfile
 	)
 
 	local result = vim.fn.system(curl_cmd)
+
+	-- Clean up temp file
+	os.remove(tmpfile)
 
 	-- Check for errors
 	if vim.v.shell_error ~= 0 then
