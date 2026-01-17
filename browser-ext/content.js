@@ -102,8 +102,16 @@ function getEditorCode() {
 
 // Send template to server via background script
 async function sendTemplate(code) {
-	if (!code || code === lastSentTemplate) {
-		return; // Don't send if empty or unchanged
+	console.log('CodeSync: sendTemplate called with', code ? code.length : 0, 'chars');
+
+	if (!code) {
+		console.log('CodeSync: No code to send');
+		return;
+	}
+
+	if (code === lastSentTemplate) {
+		console.log('CodeSync: Template unchanged, skipping');
+		return;
 	}
 
 	// Clean non-breaking spaces at character level (same as extraction)
@@ -113,12 +121,16 @@ async function sendTemplate(code) {
 		return c;
 	}).join('');
 
+	console.log('CodeSync: Sending template to background script...');
+
 	try {
 		// Send message to background script which can access localhost
 		const response = await browser.runtime.sendMessage({
 			type: 'SEND_TEMPLATE',
 			code: code
 		});
+
+		console.log('CodeSync: Background response:', response);
 
 		if (response && response.success) {
 			lastSentTemplate = code;
@@ -141,8 +153,13 @@ async function getSolutionAndInject() {
 			type: 'GET_SOLUTION'
 		});
 
-		if (!response || !response.success || !response.code || response.code.trim().length === 0) {
-			// No solution yet, silently return
+		if (!response || !response.success) {
+			// No response or failed
+			return;
+		}
+
+		if (!response.code || response.code.trim().length === 0) {
+			// No solution yet
 			return;
 		}
 
@@ -153,6 +170,8 @@ async function getSolutionAndInject() {
 			return;
 		}
 
+		console.log('CodeSync: New solution detected (' + code.length + ' chars), requesting injection...');
+
 		// Ask background script to inject (it has executeScript permissions)
 		const injectResponse = await browser.runtime.sendMessage({
 			type: 'INJECT_SOLUTION',
@@ -161,10 +180,13 @@ async function getSolutionAndInject() {
 
 		if (injectResponse && injectResponse.success) {
 			lastInjectedCode = code;
+			console.log('CodeSync: Injection successful!');
+		} else {
+			console.error('CodeSync: Injection failed:', injectResponse);
 		}
 
 	} catch (error) {
-		// Silently fail - normal during polling
+		console.error('CodeSync: Polling error:', error);
 	}
 }
 
@@ -187,7 +209,11 @@ async function init() {
 		console.log('CodeSync: First attempt - got', code ? code.length : 0, 'chars');
 		if (code && code.trim().length > 20) { // Lower threshold
 			console.log('CodeSync: Initial template extracted (' + code.length + ' chars)');
-			await sendTemplate(code);
+			try {
+				await sendTemplate(code);
+			} catch (e) {
+				console.error('CodeSync: sendTemplate failed:', e);
+			}
 		} else {
 			console.log('CodeSync: Waiting longer...');
 

@@ -102,46 +102,34 @@ browser.runtime.onMessage.addListener((message, sender) => {
 	}
 
 	if (message.type === 'INJECT_SOLUTION') {
-		// Handle injection via executeScript (has proper permissions)
+		// Handle injection via executeScript that injects into page context
 		return (async () => {
 			try {
-				const code = message.code;
-				console.log('CodeSync BG: Injecting solution (' + code.length + ' chars) into tab', sender.tab.id);
+				const codeToInject = message.code;
+				console.log('CodeSync BG: Injecting solution (' + codeToInject.length + ' chars) into tab', sender.tab.id);
 
-				// Inject into the sender tab
+				// Use a simpler approach: store code in a hidden element, then read it in page context
 				const result = await browser.tabs.executeScript(sender.tab.id, {
 					code: `
             (function() {
-              const code = ${JSON.stringify(code)};
-              console.log('CodeSync: Injection script running...');
-              console.log('CodeSync: window.monaco?', typeof window.monaco);
+              // Store code in a hidden element
+              const dataEl = document.createElement('div');
+              dataEl.id = '__codesync_data__';
+              dataEl.style.display = 'none';
+              dataEl.textContent = ${JSON.stringify(codeToInject)};
+              document.body.appendChild(dataEl);
               
-              if (window.monaco && window.monaco.editor) {
-                console.log('CodeSync: monaco.editor exists');
-                const models = window.monaco.editor.getModels();
-                console.log('CodeSync: Models count:', models ? models.length : 0);
-                
-                if (models && models.length > 0) {
-                  const currentCode = models[0].getValue();
-                  console.log('CodeSync: Current:', currentCode.length, 'New:', code.length);
-                  
-                  if (currentCode !== code) {
-                    models[0].setValue(code);
-                    console.log('CodeSync: ✓ INJECTED!');
-                    return true;
-                  } else {
-                    console.log('CodeSync: Already matches');
-                    return true;
-                  }
-                }
-              }
-              console.warn('CodeSync: ✗ Monaco not available');
-              return false;
+              // Inject script into page context
+              const script = document.createElement('script');
+              script.textContent = '(function(){const code=document.getElementById("__codesync_data__").textContent;if(window.monaco&&window.monaco.editor){const models=window.monaco.editor.getModels();if(models&&models.length>0){models[0].setValue(code);console.log("CodeSync: ✓ Injected "+code.length+" chars");}}else{console.warn("CodeSync: Monaco not found");}document.getElementById("__codesync_data__").remove();})()';
+              document.documentElement.appendChild(script);
+              script.remove();
+              return true;
             })()
           `
 				});
 
-				console.log('CodeSync BG: Result:', result);
+				console.log('CodeSync BG: Injection executed');
 				return { success: true };
 			} catch (error) {
 				console.error('CodeSync BG: Injection error:', error);
@@ -149,12 +137,6 @@ browser.runtime.onMessage.addListener((message, sender) => {
 			}
 		})();
 	}
-} catch (error) {
-	console.error('CodeSync BG: Injection failed:', error);
-	return { success: false, error: error.message };
-}
-    }) ();
-  }
 
-return Promise.resolve({ success: false, error: 'Unknown message type' });
+	return Promise.resolve({ success: false, error: 'Unknown message type' });
 });
