@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -12,6 +13,7 @@ import (
 type Server struct {
 	mu         sync.RWMutex
 	solution   string
+	template   string // Store latest template from extension
 	editorPath string
 }
 
@@ -34,9 +36,9 @@ func NewServer(editorPath string) *Server {
 }
 
 // POST /template - Extension sends problem template
-func (s *Server) handleTemplate(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleTemplatePost(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "Method not alowed", http.StatusMethodNotAllowed)
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
@@ -46,20 +48,32 @@ func (s *Server) handleTemplate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Write template to LCEditor.py
-	if err := os.WriteFile(s.editorPath, []byte(req.Code), 0644); err != nil {
-		http.Error(w, "Failed to write file", http.StatusInternalServerError)
-		log.Printf("Error writing template: %", err)
-		return
-	}
+	// Store template in memory
+	s.mu.Lock()
+	s.template = req.Code
+	s.mu.Unlock()
 
-	log.Printf("Template written to %s", s.editorPath)
+	log.Printf("Template received (%d bytes)", len(req.Code))
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]string{"status": "success"})
 }
 
-//POST /solution - neovim sends solution code
+// GET /template - Neovim fetches latest template
+func (s *Server) handleTemplateGet(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
 
+	s.mu.RLock()
+	code := s.template
+	s.mu.RUnlock()
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(SolutionResponse{Code: code})
+}
+
+// POST /solution - Neovim sends solution code
 func (s *Server) handleSolutionPost(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -81,7 +95,7 @@ func (s *Server) handleSolutionPost(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]string{"status": "success"})
 }
 
-// Get /solution - Extension fetches latest solution
+// GET /solution - Extension fetches latest solution
 func (s *Server) handleSolutionGet(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -100,8 +114,8 @@ func (s *Server) handleSolutionGet(w http.ResponseWriter, r *http.Request) {
 func corsMiddleware(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Origin", "GET, POST, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Origin", "Content-Type")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
 
 		if r.Method == http.MethodOptions {
 			w.WriteHeader(http.StatusOK)
@@ -113,7 +127,7 @@ func corsMiddleware(next http.HandlerFunc) http.HandlerFunc {
 }
 
 func main() {
-	// Default path - can be overidden via env var or flag
+	// Default path - can be overridden via env var or flag
 	editorPath := os.Getenv("LCEDITOR_PATH")
 	if editorPath == "" {
 		home, _ := os.UserHomeDir()
@@ -122,7 +136,15 @@ func main() {
 
 	server := NewServer(editorPath)
 
-	http.HandleFunc("/template", corsMiddleware(server.handleTemplate))
+	http.HandleFunc("/template", corsMiddleware(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			server.handleTemplatePost(w, r)
+		} else if r.Method == http.MethodGet {
+			server.handleTemplateGet(w, r)
+		} else {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		}
+	}))
 	http.HandleFunc("/solution", corsMiddleware(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPost {
 			server.handleSolutionPost(w, r)
