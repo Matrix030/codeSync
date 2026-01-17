@@ -6,6 +6,7 @@
   
   "permissions": [
     "activeTab",
+    "tabs",
     "http://localhost:8080/*",
     "https://leetcode.com/*"
   ],

@@ -1,17 +1,12 @@
 class Solution:
     def twoSum(self, nums: List[int], target: int) -> List[int]:
-        h = {}
+        hmap = {}
 
         for i in range(len(nums)):
-            if nums[i] not in h:
-                h[nums[i]] = i
+            if nums[i] not in hmap:
+                hmap[nums[i]] = i
             diff = target - nums[i]
-            if diff in h and h[diff] != i:
-                return i, h[diff]
-
-                #this is from browser part 2
-                #new stuff from web
-                #new stuff from nvim
-                #new things from neovim
-
-
+            if diff in hmap and hmap[diff] != i:
+                return [hmap[diff], i]
+       #this is new 
+        #another solution
