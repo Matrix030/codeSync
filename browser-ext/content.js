@@ -133,7 +133,6 @@ async function sendTemplate(code) {
 
 // Get solution from server and inject into editor
 let lastInjectedCode = '';
-let injectionWarningShown = false;
 
 async function getSolutionAndInject() {
 	try {
@@ -154,38 +153,18 @@ async function getSolutionAndInject() {
 			return;
 		}
 
-		// Get current editor content to check if injection is needed
-		const currentCode = getEditorCode();
-		if (currentCode === code) {
-			// Already matches, don't inject
+		// Ask background script to inject (it has executeScript permissions)
+		const injectResponse = await browser.runtime.sendMessage({
+			type: 'INJECT_SOLUTION',
+			code: code
+		});
+
+		if (injectResponse && injectResponse.success) {
 			lastInjectedCode = code;
-			return;
-		}
-
-		// Try Method 1: Monaco API if available  
-		if (window.monaco && window.monaco.editor) {
-			if (typeof window.monaco.editor.getModels === 'function') {
-				const models = window.monaco.editor.getModels();
-				if (models && models.length > 0) {
-					models[0].setValue(code);
-					lastInjectedCode = code;
-					injectionWarningShown = false; // Reset warning
-					console.log('CodeSync: Solution injected via Monaco API (' + code.length + ' chars)');
-					return;
-				}
-			}
-		}
-
-		// Method 2: Can't inject - show warning only once
-		if (!injectionWarningShown) {
-			console.log('CodeSync: Automatic injection not available - use manual "Inject Solution" button');
-			injectionWarningShown = true;
 		}
 
 	} catch (error) {
-		if (error.name !== 'TypeError') {
-			console.error('CodeSync: Failed to get solution:', error);
-		}
+		// Silently fail - normal during polling
 	}
 }
 
@@ -238,8 +217,17 @@ async function init() {
 		}
 	}, 5000); // Increased from 3s to 5s
 
-	console.log('CodeSync: Initialization complete - auto-injection handled by background');
+	// Start polling for solutions every 2 seconds
+	pollingInterval = setInterval(getSolutionAndInject, 2000);
+	console.log('CodeSync: Started polling for solutions every 2s');
 }
 
 // Start the extension
 init();
+
+// Cleanup on page unload
+window.addEventListener('beforeunload', () => {
+	if (pollingInterval) {
+		clearInterval(pollingInterval);
+	}
+});

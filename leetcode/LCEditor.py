@@ -10,6 +10,4 @@ class Solution:
                 return i, h[diff]
 
                 #this is from browser part 2
-                #this is new from web
-                #new changes
-                #new changes from nvim
+                #this is somethign from nvim 
