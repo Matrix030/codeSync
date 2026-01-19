@@ -98,6 +98,11 @@ func (s *Server) handleTemplateGet(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Clear the request flag on timeout so extension stops trying
+	s.mu.Lock()
+	s.templateRequest = false
+	s.mu.Unlock()
+
 	log.Printf("Timeout waiting for template from extension")
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(SolutionResponse{Code: ""})

@@ -24,7 +24,7 @@ browser.commands.onCommand.addListener(async (command) => {
 				return;
 			}
 
-			// Inject into page using executeScript
+			// Inject into page using executeScript - find the model with code
 			await browser.tabs.executeScript(tab.id, {
 				code: `
           (function() {
@@ -32,7 +32,15 @@ browser.commands.onCommand.addListener(async (command) => {
             if (window.monaco && window.monaco.editor) {
               const models = window.monaco.editor.getModels();
               if (models && models.length > 0) {
-                models[0].setValue(code);
+                let targetModel = models[0];
+                for (let i = 0; i < models.length; i++) {
+                  const val = models[i].getValue();
+                  if (val && val.trim().length > 0) {
+                    targetModel = models[i];
+                    break;
+                  }
+                }
+                targetModel.setValue(code);
                 console.log('CodeSync: Solution injected via keyboard shortcut!');
                 return true;
               }
@@ -135,10 +143,10 @@ browser.runtime.onMessage.addListener((message, sender) => {
               dataEl.style.display = 'none';
               dataEl.textContent = ${JSON.stringify(codeToInject)};
               document.body.appendChild(dataEl);
-              
-              // Inject script into page context
+
+              // Inject script into page context - find the model with code and update it
               const script = document.createElement('script');
-              script.textContent = '(function(){const code=document.getElementById("__codesync_data__").textContent;if(window.monaco&&window.monaco.editor){const models=window.monaco.editor.getModels();if(models&&models.length>0){models[0].setValue(code);console.log("CodeSync: ✓ Injected "+code.length+" chars");}}else{console.warn("CodeSync: Monaco not found");}document.getElementById("__codesync_data__").remove();})()';
+              script.textContent = '(function(){const code=document.getElementById("__codesync_data__").textContent;if(window.monaco&&window.monaco.editor){const models=window.monaco.editor.getModels();if(models&&models.length>0){let targetModel=models[0];for(let i=0;i<models.length;i++){const val=models[i].getValue();if(val&&val.trim().length>0){targetModel=models[i];break;}}targetModel.setValue(code);console.log("CodeSync: ✓ Injected "+code.length+" chars");}}else{console.warn("CodeSync: Monaco not found");}document.getElementById("__codesync_data__").remove();})()';
               document.documentElement.appendChild(script);
               script.remove();
               return true;

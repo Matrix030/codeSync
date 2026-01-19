@@ -46,10 +46,12 @@ function getEditorCode() {
 	return new Promise((resolve) => {
 		// Create a unique ID for this extraction request
 		const requestId = 'codesync-extract-' + Date.now();
+		let resolved = false;
 
 		// Listen for the response from injected script
 		const handler = (event) => {
 			if (event.detail && event.detail.requestId === requestId) {
+				resolved = true;
 				document.removeEventListener('codesync-code-extracted', handler);
 				let code = event.detail.code;
 				if (code) {
@@ -60,6 +62,8 @@ function getEditorCode() {
 						return c;
 					}).join('');
 					console.log('CodeSync: Extracted', code.length, 'chars from Monaco model');
+				} else {
+					console.log('CodeSync: Event received but code is null/empty');
 				}
 				resolve(code);
 			}
@@ -71,15 +75,30 @@ function getEditorCode() {
 		script.textContent = `
 			(function() {
 				let code = null;
+				let debugInfo = { hasMonaco: false, hasEditor: false, hasModels: false, modelCount: 0, modelSizes: [] };
 				try {
-					if (window.monaco && window.monaco.editor && window.monaco.editor.getModels) {
-						const models = window.monaco.editor.getModels();
-						if (models && models.length > 0) {
-							code = models[0].getValue();
+					debugInfo.hasMonaco = !!window.monaco;
+					if (window.monaco) {
+						debugInfo.hasEditor = !!(window.monaco.editor);
+						if (window.monaco.editor && window.monaco.editor.getModels) {
+							const models = window.monaco.editor.getModels();
+							debugInfo.hasModels = !!(models);
+							debugInfo.modelCount = models ? models.length : 0;
+							if (models && models.length > 0) {
+								// Find the model with actual code (not empty)
+								for (let i = 0; i < models.length; i++) {
+									const val = models[i].getValue();
+									debugInfo.modelSizes.push(val ? val.length : 0);
+									if (val && val.trim().length > 0 && !code) {
+										code = val;
+									}
+								}
+							}
 						}
 					}
+					console.log('CodeSync [page]: Monaco debug:', JSON.stringify(debugInfo));
 				} catch (e) {
-					console.error('CodeSync: Error in page context:', e);
+					console.error('CodeSync [page]: Error in page context:', e);
 				}
 				document.dispatchEvent(new CustomEvent('codesync-code-extracted', {
 					detail: { requestId: '${requestId}', code: code }
@@ -91,8 +110,11 @@ function getEditorCode() {
 
 		// Timeout fallback
 		setTimeout(() => {
-			document.removeEventListener('codesync-code-extracted', handler);
-			resolve(null);
+			if (!resolved) {
+				console.log('CodeSync: Extraction timed out (event never received)');
+				document.removeEventListener('codesync-code-extracted', handler);
+				resolve(null);
+			}
 		}, 1000);
 	});
 }
@@ -220,7 +242,7 @@ async function init() {
 	}, 1000); // Check every second
 
 	// Start polling for solutions
-	pollingInterval = setInterval(getSolutionAndInject, 2000);
+	pollingInterval = setInterval(getSolutionAndInject, 1000);
 	console.log('CodeSync: Started polling for solutions every 2s');
 }
 
