@@ -57,7 +57,7 @@ func (s *Server) handleTemplatePost(w http.ResponseWriter, r *http.Request) {
 
 	// Store cleaned template in memory and clear flags
 	s.mu.Lock()
-	s.template = cleanCode
+	s.template = cleanCode    // hold the template in memory
 	s.templateRequest = false // Template received, clear flag
 	s.solution = ""           // Clear old solution so it doesn't get injected
 	s.mu.Unlock()
@@ -68,6 +68,9 @@ func (s *Server) handleTemplatePost(w http.ResponseWriter, r *http.Request) {
 }
 
 // GET /template - Neovim fetches latest template
+// this function just waits for the extension to use the POST request defined above,
+// this we will know that the extension used the POST request sometime in the 5 seconds sleep time defined in the following function,
+// if the template is populated, it means that the extension sent a template using the POST and we can then send this template to neovim
 func (s *Server) handleTemplateGet(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -76,7 +79,7 @@ func (s *Server) handleTemplateGet(w http.ResponseWriter, r *http.Request) {
 
 	// Clear current template and set flag that we need a fresh one
 	s.mu.Lock()
-	s.template = ""
+	s.template = "" //clear template to get a new one from the extension
 	s.templateRequest = true
 	s.mu.Unlock()
 
@@ -100,7 +103,7 @@ func (s *Server) handleTemplateGet(w http.ResponseWriter, r *http.Request) {
 
 	// Clear the request flag on timeout so extension stops trying
 	s.mu.Lock()
-	s.templateRequest = false
+	s.templateRequest = false // Got the template from
 	s.mu.Unlock()
 
 	log.Printf("Timeout waiting for template from extension")
@@ -210,4 +213,3 @@ func main() {
 	log.Printf("Editor file: %s", editorPath)
 	log.Fatal(http.ListenAndServe(port, nil))
 }
-
