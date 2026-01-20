@@ -175,11 +175,14 @@ func main() {
 	server := NewServer(editorPath)
 
 	http.HandleFunc("/template", corsMiddleware(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodPost {
+		switch r.Method {
+		case http.MethodPost:
 			server.handleTemplatePost(w, r)
-		} else if r.Method == http.MethodGet {
+
+		case http.MethodGet:
 			server.handleTemplateGet(w, r)
-		} else {
+
+		default:
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		}
 	}))
@@ -199,11 +202,14 @@ func main() {
 		json.NewEncoder(w).Encode(map[string]bool{"needed": needed})
 	}))
 	http.HandleFunc("/solution", corsMiddleware(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodPost {
+		switch r.Method {
+		case http.MethodPost:
 			server.handleSolutionPost(w, r)
-		} else if r.Method == http.MethodGet {
+
+		case http.MethodGet:
 			server.handleSolutionGet(w, r)
-		} else {
+
+		default:
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		}
 	}))
