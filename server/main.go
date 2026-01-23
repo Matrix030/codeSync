@@ -134,15 +134,17 @@ func (s *Server) handleSolutionPost(w http.ResponseWriter, r *http.Request) {
 }
 
 // GET /solution - Extension fetches latest solution
+// Clears solution after fetch so it only gets injected once
 func (s *Server) handleSolutionGet(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
-	s.mu.RLock()
+	s.mu.Lock()
 	code := s.solution
-	s.mu.RUnlock()
+	s.solution = "" // Clear after fetch to prevent re-injection on new pages
+	s.mu.Unlock()
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(SolutionResponse{Code: code})
